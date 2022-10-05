@@ -1,0 +1,253 @@
+﻿@page "/watten"
+@using Microsoft.AspNetCore.SignalR.Client
+@using GameHub.Models.Watten
+@inject NavigationManager MyNavigationManager
+@inject ILogger<Watten> log
+
+<MudPopover AnchorOrigin="Origin.CenterCenter" TransformOrigin="Origin.CenterCenter" Open="@chooseSchlag" Fixed="true" Class="px-4 pt-4">
+    <MudChipSet SelectedChipChanged="submitSchlag">
+        <MudChip Text="7">7</MudChip>
+        <MudChip Text="8">8</MudChip>
+        <MudChip Text="9">9</MudChip>
+        <MudChip Text="10">10</MudChip>
+        <MudChip Text="11">Unter</MudChip>
+        <MudChip Text="12">Ober</MudChip>
+        <MudChip Text="13">Koenig</MudChip>
+        <MudChip Text="14">Sau</MudChip>
+    </MudChipSet>
+</MudPopover>
+
+<MudPopover Open="@chooseFarbe" Fixed="true" AnchorOrigin="Origin.CenterCenter" TransformOrigin="Origin.CenterCenter" Class="px-4 pt-4">
+    <MudChipSet SelectedChipChanged="submitFarbe">
+        <MudChip Text="herz" Color="Color.Secondary">Herz</MudChip>
+        <MudChip Text="schellen" Color="Color.Error">Schellen</MudChip>
+        <MudChip Text="gras" Color="Color.Success">Gras</MudChip>
+        <MudChip Text="eichel" Color="Color.Warning">Eichel</MudChip>
+    </MudChipSet>
+</MudPopover>
+
+<MudPopover Open="@(endText is not null)" Fixed="true" Class="px-4 pt-4">
+    <div class="d-flex flex-column">
+        <MudText>@endText</MudText>
+        <MudButton Class="ml-auto mr-n3 mb-1" Color="Color.Error">Restart</MudButton>
+    </div>
+</MudPopover>
+
+@if (!@login)
+{
+    <MudInputString @bind-Value="Group" Label="Group" Variant="Variant.Text" />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" @onclick="@Join">Submit</MudButton>
+}else{
+    <MudDropContainer @ref="_dropContainer" T="Card" Items="allCards" ItemsSelector="@((item,dropzone) => item.Identifier == dropzone)" ItemDropped="ItemUpdated" Class="d-flex flex-column flex-grow-1">
+        <ChildContent>
+            <div class="d-flex flex-column flex-grow-1">
+                <MudDropZone CanDrop="@((item) => false)" AllowReorder=true T="Card" Identifier="@Positions.Enemy.ToString()" Class="rounded-lg border-2 border-solid mud-border-lines-default d-flex flex-wrap flex-grow-1 pa-2 ma-2 rounded">
+                    <MudText>Enemy has @enemyStich Stiche</MudText>
+                </MudDropZone>
+            </div>
+            <div class="d-flex flex-column flex-grow-1">
+                <MudDropZone @ref="_board" CanDrop="@((item) => isTurn)" AllowReorder=true T="Card" Identifier="@Positions.Board.ToString()" Class="rounded-lg border-2 border-dashed mud-border-lines-default pa-6 ma-2 d-flex flex-wrap flex-grow-1 rounded">
+                        @if (isTurn)
+                        {
+                            <MudText>It is your turn</MudText><br />
+                        
+                        }else{
+                            <MudText>It is your opponents turn</MudText><br />
+                        }
+                        @if (farbText != null)
+                        {
+                            <MudText>Chosen Color is: @farbText</MudText><br />
+                        }
+                        @if (schlagText != null)
+                        {
+                            <MudText>Chosen Schlag is: @schlagText</MudText><br />
+                        }
+                </MudDropZone>
+            </div>
+            <div class="d-flex flex-column flex-grow-1">
+                <MudDropZone CanDrop="@((item) => item.Identifier == Positions.Player.ToString())" AllowReorder=true T="Card" Identifier="@Positions.Player.ToString()" Class="rounded-lg border-2 border-solid mud-border-lines-default pa-6 ma-2 d-flex flex-wrap flex-grow-1 rounded">
+                     <MudText>You have @yourStich Stiche</MudText>
+                </MudDropZone>
+            </div>
+        </ChildContent>
+        <ItemRenderer>
+            <div Class="rounded mud-paper-outlined d-flex align-center pa-3 ma-2">
+                <MudTooltip Text="@context.Tooltip">
+                    <MudImage Width=100 Src="@context.Image"  />
+                </MudTooltip>
+            </div>
+        </ItemRenderer>
+    </MudDropContainer>
+}
+
+
+@code {
+    private MudDropZone<Card> _board;
+    private MudDropContainer<Card>? _dropContainer;
+    private List<Card> allCards = new List<Card>();
+    private List<Card> myCards = new List<Card>();
+    private List<Card> opponentsCards = new List<Card>();
+
+    bool chooseSchlag = false;
+    MudChip schlag;
+    string schlagText;
+    bool chooseFarbe = false;
+    MudChip farbe;
+    string farbText;
+
+    int yourStich = 0;
+    int enemyStich = 0;
+    string endText = null;
+
+    bool login = false;
+    bool isTurn = false;
+    string Group = null;
+    public HubConnection connection;
+
+    protected async Task Join()
+    {
+        if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Staging")
+        {
+            //Initialize SignalR
+            connection = new HubConnectionBuilder()
+            .WithUrl(new Uri("https://playground.mfabi.de/wattenhub"))
+            .Build();
+        }
+        else
+        {
+            //Initialize SignalR
+            connection = new HubConnectionBuilder()
+            .WithUrl(MyNavigationManager.ToAbsoluteUri("/wattenhub"))
+            .Build();
+        }
+
+        connection.On<List<Card>>("GetInitialCards", GetInitialCards);
+        connection.On("TurnChange", TurnChange);
+        connection.On("ChooseSchlag", ChooseSchlag);
+        connection.On<string>("ChooseFarbe", ChooseFarbe);
+        connection.On<string>("ChosenFarbe", ChosenFarbe);
+        connection.On<Card>("EnemyPlayedCard", EnemyPlayedCard);
+        connection.On("YouGetStich", YouGetStich);
+        connection.On("EnemyGetStich", EnemyGetStich);
+        connection.On("YouWon", YouWon);
+        connection.On("YouLost", YouLost);
+
+        await connection.StartAsync().ContinueWith((e) =>
+        {
+            connection.InvokeAsync("JoinGroup", Group);
+        });
+        login = true;
+    }
+
+    Task YouLost()
+    {
+        endText = "You Lost";
+        return Task.CompletedTask;
+    }
+
+    Task YouWon()
+    {
+        endText = "You Won";
+        return Task.CompletedTask;
+    }
+
+    Task EnemyGetStich()
+    {
+        enemyStich += 1;
+        allCards.RemoveAll(c => c.Identifier.Equals(Positions.Board.ToString()));
+        isTurn = false;
+        _dropContainer.Refresh();
+        return Task.CompletedTask;
+    }
+
+    Task YouGetStich()
+    {
+        yourStich += 1;
+        allCards.RemoveAll(c => c.Identifier.Equals(Positions.Board.ToString()));
+        isTurn = true;
+        _dropContainer.Refresh();
+        return Task.CompletedTask;
+    }
+
+    Task EnemyPlayedCard (Card card)
+    {
+        allCards.Add(card);
+        allCards.Remove(allCards.Where(p => p.Name.Contains("opponentCard")).FirstOrDefault());
+        isTurn = true;
+        _dropContainer.Refresh();
+        return Task.CompletedTask;
+    }
+
+    Task ChosenFarbe(string chosenFarbe)
+    {
+        farbText = chosenFarbe;
+        return Task.CompletedTask;
+    }
+
+    private void submitFarbe(MudChip selectedChip)
+    {
+        farbe = selectedChip;
+        chooseFarbe = false;
+        connection.InvokeAsync("SubmitFarbe", farbe.Text, Group);
+        StateHasChanged();
+    }
+
+    Task ChooseFarbe(string chosenSchlag)
+    {
+        chooseFarbe = true;
+        schlagText = chosenSchlag;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private void submitSchlag(MudChip selectedChip)
+    {
+        schlag = selectedChip;
+        schlagText = schlag.Text;
+        chooseSchlag = false;
+        connection.InvokeAsync("SubmitSchlag", schlag.Text, Group);
+        StateHasChanged();
+    }
+
+    Task ChooseSchlag()
+    {
+        chooseSchlag = true;
+        StateHasChanged();
+        _dropContainer.Refresh();
+        return Task.CompletedTask;
+    }
+
+    Task TurnChange()
+    {
+        isTurn = true;
+        StateHasChanged();
+        _dropContainer.Refresh();
+        return Task.CompletedTask;
+    }
+
+    private void ItemUpdated(MudItemDropInfo<Card> dropItem)
+    {
+        dropItem.Item.Identifier = dropItem.DropzoneIdentifier;
+        if(dropItem.DropzoneIdentifier.Equals(Positions.Board.ToString()))
+        {
+            isTurn = false;
+            connection.InvokeAsync("PlayCard", dropItem.Item, Group);
+        }
+    }
+
+    Task GetInitialCards(List<Card> cards)
+    {
+
+        myCards = cards;
+        myCards.ForEach(c => c.Identifier = Positions.Player.ToString());
+        for(int i = 0; i < 5; i++)
+        {
+            opponentsCards.Add(new Card() { Name = "opponentCard" + i.ToString(), Identifier = Positions.Enemy.ToString(), Image = "Data/Cards/cardback.jpg" });
+        }
+        allCards.AddRange(myCards);
+        allCards.AddRange(opponentsCards);
+        _dropContainer.Refresh();
+        return Task.CompletedTask;
+    }
+
+}
