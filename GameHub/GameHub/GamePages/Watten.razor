@@ -5,7 +5,7 @@
 @inject ILogger<Watten> log
 
 <MudPopover AnchorOrigin="Origin.CenterCenter" TransformOrigin="Origin.CenterCenter" Open="@chooseSchlag" Fixed="true" Class="px-4 pt-4">
-    <MudChipSet SelectedChipChanged="submitSchlag">
+    <MudChipSet SelectedChipChanged="SubmitSchlag">
         <MudChip Text="7">7</MudChip>
         <MudChip Text="8">8</MudChip>
         <MudChip Text="9">9</MudChip>
@@ -18,7 +18,7 @@
 </MudPopover>
 
 <MudPopover Open="@chooseFarbe" Fixed="true" AnchorOrigin="Origin.CenterCenter" TransformOrigin="Origin.CenterCenter" Class="px-4 pt-4">
-    <MudChipSet SelectedChipChanged="submitFarbe">
+    <MudChipSet SelectedChipChanged="SubmitFarbe">
         <MudChip Text="herz" Color="Color.Secondary">Herz</MudChip>
         <MudChip Text="schellen" Color="Color.Error">Schellen</MudChip>
         <MudChip Text="gras" Color="Color.Success">Gras</MudChip>
@@ -184,31 +184,7 @@
         return Task.CompletedTask;
     }
 
-    private void submitFarbe(MudChip selectedChip)
-    {
-        farbe = selectedChip;
-        chooseFarbe = false;
-        connection.InvokeAsync("SubmitFarbe", farbe.Text, Group);
-        StateHasChanged();
-    }
-
-    Task ChooseFarbe(string chosenSchlag)
-    {
-        chooseFarbe = true;
-        schlagText = chosenSchlag;
-        StateHasChanged();
-        return Task.CompletedTask;
-    }
-
-    private void submitSchlag(MudChip selectedChip)
-    {
-        schlag = selectedChip;
-        schlagText = schlag.Text;
-        chooseSchlag = false;
-        connection.InvokeAsync("SubmitSchlag", schlag.Text, Group);
-        StateHasChanged();
-    }
-
+    
     Task ChooseSchlag()
     {
         chooseSchlag = true;
@@ -225,15 +201,6 @@
         return Task.CompletedTask;
     }
 
-    private void ItemUpdated(MudItemDropInfo<Card> dropItem)
-    {
-        dropItem.Item.Identifier = dropItem.DropzoneIdentifier;
-        if(dropItem.DropzoneIdentifier.Equals(Positions.Board.ToString()))
-        {
-            isTurn = false;
-            connection.InvokeAsync("PlayCard", dropItem.Item, Group);
-        }
-    }
 
     Task GetInitialCards(List<Card> cards)
     {
@@ -250,4 +217,38 @@
         return Task.CompletedTask;
     }
 
+    Task ChooseFarbe(string chosenSchlag)
+    {
+        chooseFarbe = true;
+        schlagText = chosenSchlag;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private void SubmitSchlag(MudChip selectedChip)
+    {
+        schlag = selectedChip;
+        schlagText = schlag.Text;
+        chooseSchlag = false;
+        connection.InvokeAsync("SubmitSchlag", schlag.Text, Group);
+        StateHasChanged();
+    }
+
+    private void ItemUpdated(MudItemDropInfo<Card> dropItem)
+    {
+        dropItem.Item.Identifier = dropItem.DropzoneIdentifier;
+        if(dropItem.DropzoneIdentifier.Equals(Positions.Board.ToString()))
+        {
+            isTurn = false;
+            connection.InvokeAsync("PlayCard", dropItem.Item, Group);
+        }
+    }
+
+    private void SubmitFarbe(MudChip selectedChip)
+    {
+        farbe = selectedChip;
+        chooseFarbe = false;
+        connection.InvokeAsync("SubmitFarbe", farbe.Text, Group);
+        StateHasChanged();
+    }
 }

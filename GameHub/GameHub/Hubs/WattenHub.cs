@@ -14,8 +14,8 @@ namespace GameHub.Hubs
             {
                 groups[group].playerDict.Add(Context.ConnectionId, new Player { Cards = new List<Card>()});
                 await Clients.Client(Context.ConnectionId).SendAsync("GetInitialCards", groups[group].deck.Cards.Skip(5).Take(5).ToList());
-                await Clients.Client(getOtherPlayer(group)).SendAsync("TurnChange");
-                await Clients.Client(getOtherPlayer(group)).SendAsync("ChooseSchlag");
+                await Clients.Client(GetOtherPlayer(group)).SendAsync("TurnChange");
+                await Clients.Client(GetOtherPlayer(group)).SendAsync("ChooseSchlag");
                 
             }
             else if (!groups.ContainsKey(group))
@@ -29,9 +29,9 @@ namespace GameHub.Hubs
 
         public async Task PlayCard(Card card, string group)
         {
-            await Clients.Client(getOtherPlayer(group)).SendAsync("EnemyPlayedCard", card);
+            await Clients.Client(GetOtherPlayer(group)).SendAsync("EnemyPlayedCard", card);
 
-            Card cardWithValue = calculateCardValue(card, group);
+            Card cardWithValue = CalculateCardValue(card, group);
             groups[group].playedCards.Add(Context.ConnectionId, cardWithValue);
             if (groups[group].playedCards.Count >= 2)
             {
@@ -40,23 +40,23 @@ namespace GameHub.Hubs
                     Player winningPlayer = groups[group].playerDict[Context.ConnectionId];
                     winningPlayer.stiche += 1;
                     await Clients.Client(Context.ConnectionId).SendAsync("YouGetStich");
-                    await Clients.Client(getOtherPlayer(group)).SendAsync("EnemyGetStich");
+                    await Clients.Client(GetOtherPlayer(group)).SendAsync("EnemyGetStich");
                     if (winningPlayer.stiche >= 3)
                     {
                         await Clients.Client(Context.ConnectionId).SendAsync("YouWon");
-                        await Clients.Client(getOtherPlayer(group)).SendAsync("YouLost");
+                        await Clients.Client(GetOtherPlayer(group)).SendAsync("YouLost");
                     }
                 }
                 else
                 {
-                    Player winningPlayer = groups[group].playerDict[getOtherPlayer(group)];
+                    Player winningPlayer = groups[group].playerDict[GetOtherPlayer(group)];
                     winningPlayer.stiche += 1;
-                    await Clients.Client(getOtherPlayer(group)).SendAsync("YouGetStich");
+                    await Clients.Client(GetOtherPlayer(group)).SendAsync("YouGetStich");
                     await Clients.Client(Context.ConnectionId).SendAsync("EnemyGetStich");
 
                     if (winningPlayer.stiche >= 3)
                     {
-                        await Clients.Client(getOtherPlayer(group)).SendAsync("YouWon");
+                        await Clients.Client(GetOtherPlayer(group)).SendAsync("YouWon");
                         await Clients.Client(Context.ConnectionId).SendAsync("YouLost");
                     }
                 }
@@ -64,7 +64,7 @@ namespace GameHub.Hubs
             }
         }
 
-        private Card calculateCardValue(Card card, string group)
+        private Card CalculateCardValue(Card card, string group)
         {
             if (card.Name.Contains(groups[group].farbe))
             {
@@ -80,16 +80,16 @@ namespace GameHub.Hubs
         public async Task SubmitFarbe(string farbe, string group)
         {
             groups[group].farbe = farbe;
-            await Clients.Client(getOtherPlayer(group)).SendAsync("ChosenFarbe", farbe);
+            await Clients.Client(GetOtherPlayer(group)).SendAsync("ChosenFarbe", farbe);
         }
 
         public async Task SubmitSchlag(string schlag, string group)
         {
             groups[group].stich = schlag;
-            await Clients.Client(getOtherPlayer(group)).SendAsync("ChooseFarbe", schlag).ConfigureAwait(false);
+            await Clients.Client(GetOtherPlayer(group)).SendAsync("ChooseFarbe", schlag).ConfigureAwait(false);
         }
 
-        private string getOtherPlayer(string group)
+        private string GetOtherPlayer(string group)
         {
             return groups[group].playerDict.Keys.First(p => !p.Equals(Context.ConnectionId));
         }
